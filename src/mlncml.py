@@ -1,72 +1,87 @@
 # mlncml.py
 import numpy as np
 
-def arnold_cat_map_indices(i, p, q, L):
+
+def arnold_map(i, p, q, L):
     """
-    Arnold cat map formula for pair (i, j) will be used in MLNCML index mapping.
-    We'll return mapping of index i -> (j,k) but for simplicity we'll produce
-    permutations via 2D mapping using the standard matrix:
-    [1 p; q pq+1] * [i; j] (mod L)
-    Here we implement a simple 1D index mapping for generating mixing indices.
+    Implements the Arnold-cat map indices per paper Eq.(9):
+        [ j ]   [1  p ] [ i ]   (mod L)
+        [ k ] = [q pq+1] [ i ]
+    For index i (0..L-1) returns j,k in 0..L-1 (integers).
+    (The paper presents these relations for selecting lattice links.)
     """
-    # For simplicity in 1D usage, we will not explicitly compute j,k for each i.
-    # We'll return i (no change). The paper uses these to couple lattices. We'll
-    # rely primarily on coupled logistic maps to produce chaotic matrix.
-    return i
+    i_int = int(i) % L
+    j = (1 * i_int + p * i_int) % L
+    k = (q * i_int + (p * q + 1) * i_int) % L
+    return int(j), int(k)
+
 
 def generate_mlcnml_matrix(N, M, key=None):
     """
-    Generates an N x M chaotic matrix H using MLNCML-like mixing.
-    key is a dict-like with parameters:
+    Generate N x M chaotic matrix H using MLNCML per the paper.
+    key : dict-like with keys
         epsilon, eta, mu, x0, iterations, p, q, Len
-    Returns float matrix H (values in (0,1)).
+    Returns H with values in (0,1).
     """
-
-    """Pramit is a bitchboorty"""
     if key is None:
         key = {}
-    epsilon = key.get('epsilon', 0.3)
-    eta     = key.get('eta', 0.2)
-    mu      = key.get('mu', 3.99)
-    x0      = key.get('x0', 0.3456789)
-    iterations = key.get('iterations', 1000)
-    # simple lattice length
-    Len = max(N, M)
-    # initialize lattices with slightly different seeds
-    xs = np.zeros((Len,), dtype=np.float64)
+
+    epsilon = float(key.get("epsilon", 0.3))
+    eta = float(key.get("eta", 0.2))
+    mu = float(key.get("mu", 3.99))
+    x0 = float(key.get("x0", 0.3456789))
+    iterations = int(key.get("iterations", 1000))
+    p = int(key.get("p", 1))
+    q = int(key.get("q", 1))
+
+    Len = int(key.get("Len", max(N, M)))
+
+    indices = np.arange(Len)
+    xs = (x0 + 0.01 * (indices + 1)) % 1.0
+
+    j_indices = np.zeros(Len, dtype=int)
+    k_indices = np.zeros(Len, dtype=int)
     for i in range(Len):
-        xs[i] = (x0 + 0.01 * (i+1)) % 1.0
+        j_indices[i], k_indices[i] = arnold_map(i, p, q, Len)
 
-    def tau(x): return mu * x * (1.0 - x)
+    def tau(x):
+        return mu * x * (1.0 - x)
 
-    # iterate and produce a pool of values
     for _ in range(iterations):
-        xs_new = np.copy(xs)
-        for i in range(Len):
-            left = xs[(i-1) % Len]
-            right = xs[(i+1) % Len]
-            # simplified MLNCML update
-            xs_new[i] = (1 - epsilon) * tau(xs[i]) + (epsilon/2) * (tau(left) + tau(right))
+        tau_xs = tau(xs)
+        tau_left = np.roll(tau_xs, 1)
+        tau_right = np.roll(tau_xs, -1)
+        tau_j = tau_xs[j_indices]
+        tau_k = tau_xs[k_indices]
+
+        term_self = (1.0 - epsilon) * tau_xs
+        term_local = ((1.0 - eta) * epsilon / 2.0) * (tau_right + tau_left)
+        term_arnold = (eta * epsilon / 2.0) * (tau_j + tau_k)
+        xs_new = term_self + term_local + term_arnold
+
+        xs_new = np.clip(xs_new, 1e-15, 1.0 - 1e-15)
         xs = xs_new
 
-    # build H by sampling and mixing xs and secondary logistic runs
-    H = np.zeros((N, M), dtype=np.float64)
-    # additional logistic stream for cross-coupling
+    total_elements = N * M
+    y_values = np.zeros(total_elements)
     y = (x0 * 1.7321) % 1.0
-    for i in range(N):
-        for j in range(M):
-            idx = (i + j) % Len
-            # small mixing with second stream
-            y = mu * y * (1 - y)
-            H[i, j] = (xs[idx] + 0.5 * y) % 1.0
+    for k in range(total_elements):
+        y_values[k] = y
+        y = mu * y * (1.0 - y)
+
+    i_grid, j_grid = np.meshgrid(np.arange(N), np.arange(M), indexing="ij")
+    idx = (i_grid + j_grid) % Len
+    H = (xs[idx] + 0.5 * y_values.reshape(N, M)) % 1.0
 
     return H
+
 
 def binary_chaotic_matrix(N, M, key=None):
     H = generate_mlcnml_matrix(N, M, key)
     e = H.mean()
     Hb = (H >= e).astype(np.uint8)
     return Hb
+
 
 def encrypt_watermark(watermark_binary, Hb):
     """
