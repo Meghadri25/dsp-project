@@ -192,15 +192,6 @@ def save_variants_and_debug(a, basename="extracted_watermark", N_expected=None, 
     except Exception as e:
         print("BMP save failed:", e)
 
-    # Transposed variants
-    try:
-        aT = a_out.T
-        save_png_native(basename + "_T.png", aT)
-        save_bmp_native(basename + "_T.bmp", aT)
-        print("Saved transposed variants.")
-    except Exception as e:
-        print("Transposed save failed:", e)
-
 # ---------------- Embedding function (unchanged except K heuristic) ----------------
 def embed_watermark(audio_path, watermark_path, out_path,
                     L1=4, delta=0.05, mlncml_key=None):
@@ -290,9 +281,9 @@ def embed_watermark(audio_path, watermark_path, out_path,
 # ===============  MAIN: EMBED OR EXTRACT  =================
 # ==========================================================
 if __name__ == "__main__":
-    mode = "extract"   # set "embed" or "extract"
+    mode = "embed"   # set "embed" or "extract"
 
-    key = {'epsilon': 0.3, 'eta': 0.2, 'mu': 3.99, 'x0': 0.3456789, 'iterations': 500}
+    key = {'epsilon': 0.3, 'eta': 0.2, 'mu': 0.1, 'x0': 0.3456789, 'iterations': 500}
 
     if mode == "embed":
         audio_in = "The_Color_Violet.wav"
@@ -300,7 +291,7 @@ if __name__ == "__main__":
         audio_out = "watermarked.wav"
 
         params, dims = embed_watermark(audio_in, watermark_img, audio_out,
-                                       L1=4, delta=0.05, mlncml_key=key)
+                                       L1=4, delta=0.0001, mlncml_key=key)
 
         print("✅ Embedding complete.")
         print("params:", params)
