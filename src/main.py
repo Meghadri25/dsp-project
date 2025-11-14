@@ -281,27 +281,46 @@ def embed_watermark(audio_path, watermark_path, out_path,
 # ===============  MAIN: EMBED OR EXTRACT  =================
 # ==========================================================
 if __name__ == "__main__":
-    mode = "embed"   # set "embed" or "extract"
+    mode = "extract"   # set "embed" or "extract"
 
-    key = {'epsilon': 0.3, 'eta': 0.2, 'mu': 0.1, 'x0': 0.3456789, 'iterations': 500}
+    key = {'epsilon': 0.3, 'eta': 0.2, 'mu': 3.99, 'x0': 0.3456789, 'iterations': 500}
 
     if mode == "embed":
+        import os
+        
+        # Create output directory
+        output_dir = "results/embed_results"
+        os.makedirs(output_dir, exist_ok=True)
+        
         audio_in = "The_Color_Violet.wav"
         watermark_img = "watermark.png"
-        audio_out = "watermarked.wav"
+        audio_out = os.path.join(output_dir, "watermarked.wav")
 
         params, dims = embed_watermark(audio_in, watermark_img, audio_out,
-                                       L1=4, delta=0.0001, mlncml_key=key)
+                                       L1=4, delta=0.05, mlncml_key=key)
 
         print("✅ Embedding complete.")
         print("params:", params)
         print("dims:", dims)
 
-        np.savez("embed_params.npz", **params, N=dims[0], M=dims[1])
-        print("🔒 Saved embedding parameters to embed_params.npz")
+        params_file = os.path.join(output_dir, "embed_params.npz")
+        np.savez(params_file, **params, N=dims[0], M=dims[1])
+        print(f"🔒 Saved embedding parameters to {params_file}")
 
     elif mode == "extract":
-        data = np.load("embed_params.npz", allow_pickle=True)
+        import os
+        
+        # Create output directory for extraction results
+        extract_output_dir = "results/extract_results"
+        os.makedirs(extract_output_dir, exist_ok=True)
+        
+        # Try to load params from embed_results directory first, then fallback to current dir
+        params_path = "results/embed_results/embed_params.npz"
+        if not os.path.exists(params_path):
+            params_path = "embed_params.npz"
+            print(f"⚠️ Using fallback params path: {params_path}")
+        
+        data = np.load(params_path, allow_pickle=True)
 
         def safe_scalar(val):
             try:
@@ -334,7 +353,11 @@ if __name__ == "__main__":
         params = {k: data[k].item() if data[k].shape == () else data[k]
                   for k in data.files if k not in ("N", "M")}
 
-        watermarked_audio = "watermarked.wav"
+        # Try to load watermarked audio from embed_results directory first
+        watermarked_audio = "results/embed_results/watermarked.wav"
+        if not os.path.exists(watermarked_audio):
+            watermarked_audio = "watermarked.wav"
+            print(f"⚠️ Using fallback audio path: {watermarked_audio}")
 
         audio_signal, Fs = sf.read(watermarked_audio)
         if audio_signal.ndim > 1:
@@ -351,6 +374,8 @@ if __name__ == "__main__":
         print("🔍 Extracting watermark...")
         W_extracted = extract_watermark_from_audio(audio_signal, Fs, N, M, params)
 
-        # Save diagnostics + multiple variants (PNG, BMP, .npy, transposed)
-        save_variants_and_debug(W_extracted, basename="extracted_watermark", N_expected=N, M_expected=M)
+        # Save diagnostics + multiple variants (PNG, BMP, .npy, transposed) to extract_results
+        basename = os.path.join(extract_output_dir, "extracted_watermark")
+        save_variants_and_debug(W_extracted, basename=basename, N_expected=N, M_expected=M)
         print("✅ Extraction + diagnostics complete.")
+        print(f"📁 All extraction results saved to: {extract_output_dir}/")

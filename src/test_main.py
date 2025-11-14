@@ -232,10 +232,10 @@ def run_attack_and_eval(name, attack_fn, audio_orig, audio_wm, Fs, N, M, params,
 def main():
     parser = argparse.ArgumentParser(description="Test DSP attacks on watermarked audio and evaluate SNR, BER, NC")
     parser.add_argument("--original",default='The_Color_Violet.wav' , help="Path to original (clean) audio WAV")
-    parser.add_argument("--watermarked", default= 'watermarked.wav', help="Path to watermarked audio WAV")
+    parser.add_argument("--watermarked", default= 'results/embed_results/watermarked.wav', help="Path to watermarked audio WAV")
     parser.add_argument("--watermark", default='watermark.png', help="Path to original watermark image (PNG/JPG)")
-    parser.add_argument("--params", default="embed_params.npz", help="Path to embed_params.npz (saved during embedding)")
-    parser.add_argument("--outdir", default="results", help="Directory to save outputs")
+    parser.add_argument("--params", default="results/embed_results/embed_params.npz", help="Path to embed_params.npz (saved during embedding)")
+    parser.add_argument("--outdir", default="results/attack_results", help="Directory to save outputs")
     parser.add_argument("--attacks", nargs="*", choices=["lpf","hpf","crop","noise"], default=None,
                         help="Which attacks to run. If omitted --all-attacks runs all.")
     parser.add_argument("--lpf-cutoff", type=float, default=4000.0, help="LPF cutoff frequency (Hz)")
