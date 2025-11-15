@@ -1,7 +1,6 @@
 \documentclass{AnantDocumentation}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
-
 \backgroundsetup{
 	contents=""
 }
@@ -18,7 +17,7 @@
 \end{center}
 
 \section{Approach}
-The reference paper by Yamni et al. \cite{yamni202efficient} combines three transforms to encrypt and embed an image as a binary watermark into the low frequency components of an audio signal. We replicate their method and analyze its performance under various attacks.
+The reference paper by Yamni et al. combines three transforms to encrypt and embed an image as a binary watermark into the low frequency components of an audio signal. We replicate their method and analyze its performance under various attacks. (\href{https://github.com/Meghadri25/dsp-project}{\textbf{Github Repo}})
 
 We embed a binary watermark using chaotic encryption, wavelet decomposition and Tchebichef moment modulation. We begin with the chaotic encryption, MLNCML, where we use a map defined by $\epsilon = 0.4, \mu = 3.99$ to generate a chaotic bit-plane $H_b$. 
 The watermark $W$ is then encrypted using exor operation: 
@@ -104,23 +103,22 @@ In order to effectively demonstrate the watermarking, the original and encrypted
 	\begin{subfigure}{0.4\textwidth}
 		\centering
 		\includegraphics[width=0.5\textwidth]{../watermark.png}
-		\caption{Original Watermark}
 		\label{fig:original_watermark}
 	\end{subfigure}
 	\hfill
 	\begin{subfigure}{0.4\textwidth}
 		\centering
 		\includegraphics[width=0.5\textwidth]{../results/extract_results/extracted_watermark.png}
-		\caption{Extracted Watermark}
 		\label{fig:encrypted_watermark}
 	\end{subfigure}
-	\label{fig:Insert the Reference Tag}
+	\caption{Original watermark (left) and extracted watermark with no attack (right)}
+	\label{fig:watermarks}
 \end{figure}
 
 You would note that the structure of the extracted image is very similar, with even fine details like the numbers on the dial being preserved.
 
 Now, the attacked images are shown in figure \ref{fig:attacked_watermarks}.
-\begin{figure*}[h!]
+\begin{figure}[h!]
     \centering
     % Row 1
     \begin{subfigure}{0.18\textwidth}
@@ -187,9 +185,9 @@ Now, the attacked images are shown in figure \ref{fig:attacked_watermarks}.
 		\caption{}
 		\label{fig:re-recorded watermark}
     \end{subfigure}
-	\label{fig:attacked_watermarks}
 	\caption{(a) No attack extraction (b) 20\% Crop (c) Gaussian Noise 20dB (d) HPF 100Hz (e) LPF 4kHz (f) MP3 32kbps (g) MP3 64kbps (h) MP3 128kbps (i) Random Time Scaling $\pm$10\% (j) Re-recording}
-\end{figure*}
+	\label{fig:attacked_watermarks}
+\end{figure}
 
 From the results, we see that this watermarking method is very effective against nearly all attacks, save for re-recording and time scaling.
 However, an important note is that the audio quality is significantly degraded in these two cases, as can be seen from the very low SNR and SI-SDR values in Table \ref{tab:results}.
