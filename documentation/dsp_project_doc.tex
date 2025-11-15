@@ -66,10 +66,10 @@ The paper proposes a few different kinds of attacks that they tested their water
 \begin{enumerate}
 	\item \textbf{Cropping by 20\%: } We remove 20\% of random audio samples from the watermarked audio to simulate random data loss.
 	\item \textbf{Gaussian Noise of $20dB$: } We add white Gaussian noise to the watermarked audio such that the resulting SNR is 20 dB.
-	\item \textbf{High-Pass Filter at 100Hz: }
-	\item \textbf{Low-Pass Filter at 4kHz: }
+	\item \textbf{High-Pass Filter at 100Hz}
+	\item \textbf{Low-Pass Filter at 4kHz}
 	\item \textbf{MP3 compression at 32, 64 and 128 kbps: } To simulate lossy compression, we encode and decode the watermarked audio using MP3 compression.
-	\item \textbf{Random Time Scaling by $\pm 10\%$: } We randomly speed up or slow down the watermarked audio by up to 10\%.
+	\item \textbf{Random Time Scaling by $\pm 20\%$: } We randomly speed up or slow down the watermarked audio by up to 20\%.
 	\item \textbf{Re-recording: } We simulate re-recording by playing the watermarked audio through speakers and capturing it with a microphone. 
 \end{enumerate}
 
@@ -80,7 +80,7 @@ Table \ref{tab:results} summarizes the results of these attacks on the audio and
 \toprule
 \textbf{Attack} & \textbf{SNR (dB)} & \textbf{SI-SDR} & \textbf{BER} & \textbf{NC} &  \textbf{LMSE} & \textbf{SSIM}\\
 \midrule
-No Attack &7.734&6.933&0&1&0 & 1\\
+No Attack &7.734&6.933&0.000&1.000&0.000 & 1.000\\
 20\% Crop &4.749	&2.977	&0.104	&0.792	&1.808	&0.263\\ 
 Gaussian 20dB & 7.525	& 6.683	& 0.004	& 0.993	& 0.043	&0.989 \\
 HPF 100Hz & 1.742	&-2.868	& 0.322	& 0.356	& 3.749	& 0.159 \\
@@ -88,11 +88,11 @@ LPF 4kHz & 6.808 & 5.794 & 0.0199	& 0.960	& 0.380 & 0.598 \\
 MP3 32kbps & 6.669	& 5.643	& 0.180	& 0.640	& 2.811	& 0.181 \\
 MP3 64kbps & 7.379	& 6.538	& 0.075	& 0.850	& 1.317	& 0.357 \\
 MP3 128kbps & 7.662	& 6.909	& 0.001	& 0.998	& 0.015	& 0.973 \\
-Time Scale $\pm 10\%$ & -1.457	& -38.571	& 0.499	& 0.002	& 5.313	& 0.002\\
+Time Scale $\pm 20\%$ & -1.457	& -38.571	& 0.499	& 0.002	& 5.313	& 0.002\\
 Re-recording & 1.842	& -0.274	& 0.483	& 0.035	& 5.262	& 0.008 \\
 \bottomrule
 \end{tabular}
-\caption{Attack robustness metrics: SNR (audio quality), BER (bit errors), NC (pattern correlation)}
+\caption{Audio (SNR and SI-DBR) and Watermark (BER, NC, LMSE, SSIM) quality metrics under various attacks}
 \label{tab:results}
 \end{table}
 
@@ -189,9 +189,9 @@ Now, the attacked images are shown in figure \ref{fig:attacked_watermarks}.
 	\label{fig:attacked_watermarks}
 \end{figure}
 
-From the results, we see that this watermarking method is very effective against nearly all attacks, save for re-recording and time scaling.
+From the results, we see that this watermarking method is very effective against nearly all attacks, save for the HPF, re-recording and time scaling.
 However, an important note is that the audio quality is significantly degraded in these two cases, as can be seen from the very low SNR and SI-SDR values in Table \ref{tab:results}.
-This means that the low performance of the watermarking method is not the primary issue, as pirates or other opposition parties would be unlikely to use such low-quality audio.
+This means that the low performance of the watermarking method is not the primary issue, as pirates or other adversaries would be unlikely to use such low-quality audio.
 \newpage
 
 \section*{Appendix: System Architecture}
@@ -219,7 +219,7 @@ Figure \ref{fig:flowchart} shows how the three transforms work together. The wat
     \node (dwt) [process, below=of segment] {3-Level DWT};
     \node (extract) [process, below=of dwt] {Extract $A_3$};
     \node (dtmt) [process, below=of extract] {DTMT ($M_1, M_2$)};
-    \node (modify) [process, below=of dtmt] {Modify Norms};
+	\node (modify) [process, below=of dtmt] {Modify Norms of $M_1, M_2$ to encode bit};
     \node (idtmt) [process, below=of modify] {Inverse DTMT};
     \node (idwt) [process, below=of idtmt] {Inverse DWT};
     \node (watermarked) [startstop, below=of idwt] {Watermarked Audio};
