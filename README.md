@@ -94,7 +94,7 @@ To test watermark robustness against various attacks:
 python src/test_main.py
 ```
 
-This will apply attacks like low-pass/high-pass filtering, cropping, noise addition, MP3 compression, re-recording simulation, and time scaling, then extract watermarks and compute metrics (BER, NC, SNR).
+This will apply attacks like low-pass/high-pass filtering, cropping, noise addition, MP3 compression, re-recording simulation, and time scaling, then extract watermarks and compute metrics (BER, NC, SNR, SI-SDR, SSIM, LMSE).
 
 Results are saved to `results/attack_results/` with individual subdirectories for each attack containing the attacked audio and extracted watermark image. A summary CSV is generated at `results/attack_results/results_summary.csv`.
 
@@ -132,6 +132,7 @@ Provides functions for loading/saving audio and images, and parameter management
 - scipy
 - pydub
 - librosa
+- scikit-image
 
 ## Notes
 
