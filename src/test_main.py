@@ -5,6 +5,8 @@ import soundfile as sf
 import tempfile
 from pydub import AudioSegment
 import librosa
+from scipy.ndimage import laplace
+from skimage.metrics import structural_similarity as ssim
 
 from extractor import extract_watermark_from_audio
 from utils import load_audio, load_image, load_parameters, save_image
@@ -65,6 +67,26 @@ def compute_snr(clean, test):
     return snr_db
 
 
+def si_sdr(clean, test):
+
+    reference = clean.astype(np.float64)
+    estimated = test.astype(np.float64)
+
+    min_len = min(len(reference), len(estimated))
+    reference = reference[:min_len]
+    estimated = estimated[:min_len]
+
+    alpha = np.dot(estimated, reference) / np.dot(reference, reference)
+    projected = alpha * reference
+
+    noise = estimated - projected
+
+    ratio = np.sum(projected ** 2) / np.sum(noise ** 2)
+    si_sdr_value = 10 * np.log10(ratio)
+
+    return si_sdr_value
+
+
 def bicmp_to_bipolar(W):
     return (W.astype(np.int8) * 2) - 1
 
@@ -74,6 +96,22 @@ def normalized_correlation(W_ref, W_extr):
     Wh = bicmp_to_bipolar(W_extr).astype(float)
     return float(np.sum(Wb * Wh) / (Wb.size + EPS))
 
+def laplacian_mse(W_ref, W_extr):
+    Wb = W_ref.astype(float)
+    Wh = W_extr.astype(float)
+
+    lap_ref = laplace(Wb)
+    lap_extr = laplace(Wh)
+
+    mse = np.mean((lap_ref - lap_extr) ** 2)
+    return float(mse)
+
+def structural_similarity(W_ref, W_extr):
+    Wb = W_ref.astype(float)
+    Wh = W_extr.astype(float)
+
+    ssim_value= ssim(Wb, Wh, data_range = Wh.max() - Wh.min(), full=False)
+    return float(ssim_value)
 
 def bit_error_rate(W_ref, W_extr):
     Nr, Mr = W_ref.shape
@@ -243,6 +281,35 @@ def main():
             reader = csv.DictReader(f)
             existing_results = list(reader)
 
+    baseline_exists = any(r.get("attack") == "No_Attack_Baseline" for r in existing_results)
+    if not baseline_exists:
+        print("\n--- Baseline: No Attack ---")
+        baseline_snr = compute_snr(audio_orig, audio_wm)
+        baseline_si_sdr = si_sdr(audio_orig, audio_wm)
+
+        W_baseline = extract_watermark_from_audio(audio_wm, Fs, N, M, params)
+        W_baseline_bin = (np.asarray(W_baseline) > 0).astype(np.uint8)
+
+        baseline_dir = os.path.join(outdir, "No_Attack_Baseline")
+        os.makedirs(baseline_dir, exist_ok=True)
+        save_image(W_baseline, N, M, baseline_dir)
+
+        baseline_ber = bit_error_rate(watermark_bin, W_baseline_bin)
+        baseline_nc = normalized_correlation(watermark_bin, W_baseline_bin)
+        baseline_lap_mse = laplacian_mse(watermark_bin, W_baseline_bin)
+        baseline_ssim = structural_similarity(watermark_bin, W_baseline_bin)
+                
+        baseline_result = {
+            "attack": "No_Attack_Baseline",
+            "snr_db": baseline_snr,
+            "si_sdr": baseline_si_sdr,
+            "ber": baseline_ber,
+            "nc": baseline_nc,
+            "lap_mse": baseline_lap_mse,
+            "ssim": baseline_ssim
+        }
+        results.insert(0, baseline_result)
+
     for name, fn in attack_configs:
         attack_dir = os.path.join(outdir, name)
         if os.path.exists(attack_dir):
@@ -259,6 +326,7 @@ def main():
         print(f"Attacked audio saved to: {audio_path}")
 
         snr_db = compute_snr(audio_orig, attacked)
+        si_sdr_value = si_sdr(audio_orig, attacked)
 
         W_extracted = extract_watermark_from_audio(attacked, Fs, N, M, params)
         W_extr_bin = (np.asarray(W_extracted) > 0).astype(np.uint8)
@@ -267,14 +335,16 @@ def main():
 
         ber = bit_error_rate(watermark_bin, W_extr_bin)
         nc = normalized_correlation(watermark_bin, W_extr_bin)
+        lap_mse = laplacian_mse(watermark_bin, W_extr_bin)
+        ssim = structural_similarity(watermark_bin, W_extr_bin)
 
-        results.append({"attack": name, "snr_db": snr_db, "ber": ber, "nc": nc})
+        results.append({"attack": name, "snr_db": snr_db, "si_sdr": si_sdr_value, "ber": ber, "nc": nc, "lap_mse": lap_mse, "ssim": ssim})
 
     # Combine existing and new results
     all_results = existing_results + results
 
     with open(csv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["attack", "snr_db", "ber", "nc"])
+        writer = csv.DictWriter(f, fieldnames=["attack", "snr_db", "si_sdr", "ber", "nc", "lap_mse", "ssim"])
         writer.writeheader()
         for r in all_results:
             writer.writerow(r)

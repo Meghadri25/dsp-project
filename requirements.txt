@@ -4,3 +4,5 @@ imageio
 scipy
 pydub
 librosa
+skimage.metrics
+pesq

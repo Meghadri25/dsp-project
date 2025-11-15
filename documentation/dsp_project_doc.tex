@@ -6,65 +6,194 @@
 	contents=""
 }
 
-\title{Audio Watermarking using DWT-DTMT-MLNCML:\\Implementation and Analysis}
+
+\title{ECE F434 Project Report: Audio Watermarking}
 \author{Meghadri Ghosh - 2023A3PS0314P \\ Pramit Pal - 2023AAPS0765P \\ Pranav Chandra N. V. - 2023AAPS0013P}
 
 \begin{document}
-\maketitle
+\begin{center}
+	{\Large ECE F434 Project Report: Audio Watermarking \par}
+	\vspace{0.3cm}
+	{\normalsize Meghadri Ghosh - 2023A3PS0314P \\ Pramit Pal - 2023AAPS0765P \\ Pranav Chandra N. V. - 2023AAPS0013P \par}
+\end{center}
 
 \section{Approach}
+The reference paper by Yamni et al. \cite{yamni202efficient} combines three transforms to encrypt and embed an image as a binary watermark into the low frequency components of an audio signal. We replicate their method and analyze its performance under various attacks.
 
-We combined three transforms: MLNCML encrypts the watermark $W \in \{0,1\}^{32 \times 32}$ using coupled logistic maps to produce $W' = W \oplus H_b$ where $H_b$ is generated with $\epsilon=0.3, \mu=3.99$. The audio is segmented into $L_{\text{seg}} = \lceil (N \cdot M) / L_1 \rceil = 256$ blocks. Each segment undergoes 3-level Haar DWT:
+We embed a binary watermark using chaotic encryption, wavelet decomposition and Tchebichef moment modulation. We begin with the chaotic encryption, MLNCML, where we use a map defined by $\epsilon = 0.4, \mu = 3.99$ to generate a chaotic bit-plane $H_b$. 
+The watermark $W$ is then encrypted using exor operation: 
 \begin{equation}
-\text{DWT}^3(\text{segment}) \rightarrow (A_3, D_3, D_2, D_1)
+W' = W \oplus H_b .
 \end{equation}
-where $A_3$ contains low-frequency approximation coefficients. We divide $A_3$ into $L_1=4$ sub-blocks and apply DTMT with $K = \min(64, L_2/2)$ Tchebichef polynomial orders:
+The audio is simultaneously divided into $L_{\text{seg}} = \left\lceil \frac{N M}{L_1} \right\rceil = 256$ segments, and each undergoes a 3-level Haar DWT:
 \begin{equation}
-M = T \cdot \text{pa3}, \quad T \in \mathbb{R}^{K \times L_2}
+\text{DWT}^3(\text{segment}) \rightarrow (A_3, D_3, D_2, D_1),
 \end{equation}
-Moments split into even/odd indices: $M_1 = M[0::2], M_2 = M[1::2]$. We embed bit $b$ by modifying norms:
+with embedding performed in the low-frequency block \( A_3 \). This block is split into \( L_1 = 4 \) sub-blocks, and each is transformed using DTMT with $K = \min(64, L_2/2)$ Tchebichef orders:
 \begin{equation}
-(\sigma_1', \sigma_2') = \begin{cases}
-(\bar{\sigma} + \delta, \bar{\sigma} - \delta) & b = 1 \\
-(\bar{\sigma} - \delta, \bar{\sigma} + \delta) & b = 0
-\end{cases}, \quad \bar{\sigma} = \frac{\|M_1\| + \|M_2\|}{2}, \quad \delta=0.05
+M = T\,\text{pa3}, \qquad T \in \mathbb{R}^{K \times L_2}.
 \end{equation}
-Reconstruction uses inverse DTMT ($\text{pa3}' = T^T M'$) and inverse DWT. Extraction compares $\|M_1\|$ vs $\|M_2\|$ to recover bits, then decrypts: $\hat{W} = \hat{W}' \oplus H_b$. See Figure \ref{fig:flowchart}.
+Moments are separated as even and odd components, and a bit \( b \) is embedded by adjusting their norms. With
+\begin{equation}
+\bar{\sigma} = \frac{\|M_1\| + \|M_2\|}{2}, \qquad \delta = 0.05,
+\end{equation}
+the modified norms are
+\begin{equation}
+(\sigma_1',\sigma_2') =
+\begin{cases}
+(\bar{\sigma}+\delta,\ \bar{\sigma}-\delta), & b=1,\\
+(\bar{\sigma}-\delta,\ \bar{\sigma}+\delta), & b=0.
+\end{cases}
+\end{equation}
+Reconstruction uses the inverse DTMT,
+\begin{equation}
+\text{pa3}' = T^{T} M',
+\end{equation}
+followed by inverse DWT to obtain the watermarked segment.
+During extraction, the bit is detected by comparing norms:
+\begin{equation}
+\hat{b} = \mathbf{1}\!\left(\|M_1\| > \|M_2\|\right),
+\end{equation}
+and the final watermark is recovered via
+\begin{equation}
+\hat{W} = \hat{W}' \oplus H_b .
+\end{equation}
 
-\section{Results}
+Figure \ref{fig:flowchart} in the appendix illustrates the complete enxryption and decryption pipeline.
 
-Table \ref{tab:results} shows robustness against four attacks: LPF (4 kHz) should succeed since we embed in low frequencies, HPF (300 Hz) attacks our weak point, cropping (20\%) tests localized damage, and Gaussian noise (20 dB) tests statistical perturbations.
+\section{Testing and Results}
+\subsection{Testing}
+The paper proposes a few different kinds of attacks that they tested their watermarking system against. We used a few of these tests(1-4) as well as proposed some new ones(5-7) in order to extend the robustness analysis of the watermarking system.
+\begin{enumerate}
+	\item \textbf{Cropping by 20\%: } We remove 20\% of random audio samples from the watermarked audio to simulate random data loss.
+	\item \textbf{Gaussian Noise of $20dB$: } We add white Gaussian noise to the watermarked audio such that the resulting SNR is 20 dB.
+	\item \textbf{High-Pass Filter at 100Hz: }
+	\item \textbf{Low-Pass Filter at 4kHz: }
+	\item \textbf{MP3 compression at 32, 64 and 128 kbps: } To simulate lossy compression, we encode and decode the watermarked audio using MP3 compression.
+	\item \textbf{Random Time Scaling by $\pm 10\%$: } We randomly speed up or slow down the watermarked audio by up to 10\%.
+	\item \textbf{Re-recording: } We simulate re-recording by playing the watermarked audio through speakers and capturing it with a microphone. 
+\end{enumerate}
 
+Table \ref{tab:results} summarizes the results of these attacks on the audio and watermark. The SNR and BER 
 \begin{table}[h]
 \centering
-\caption{Attack robustness metrics: SNR (audio quality), BER (bit errors), NC (pattern correlation)}
-\label{tab:results}
-\begin{tabular}{@{}lccc@{}}
+\begin{tabular}{@{}lcccccc@{}}
 \toprule
-\textbf{Attack} & \textbf{SNR (dB)} & \textbf{BER} & \textbf{NC} \\
+\textbf{Attack} & \textbf{SNR (dB)} & \textbf{SI-SDR} & \textbf{BER} & \textbf{NC} &  \textbf{LMSE} & \textbf{SSIM}\\
 \midrule
-LPF 4000 Hz     & --- & --- & --- \\
-HPF 300 Hz      & --- & --- & --- \\
-CROP 20\%       & --- & --- & --- \\
-Gaussian 20 dB  & --- & --- & --- \\
+No Attack &7.734&6.933&0&1&0 & 1\\
+20\% Crop &4.749	&2.977	&0.104	&0.792	&1.808	&0.263\\ 
+Gaussian 20dB & 7.525	& 6.683	& 0.004	& 0.993	& 0.043	&0.989 \\
+HPF 100Hz & 1.742	&-2.868	& 0.322	& 0.356	& 3.749	& 0.159 \\
+LPF 4kHz & 6.808 & 5.794 & 0.0199	& 0.960	& 0.380 & 0.598 \\ 
+MP3 32kbps & 6.669	& 5.643	& 0.180	& 0.640	& 2.811	& 0.181 \\
+MP3 64kbps & 7.379	& 6.538	& 0.075	& 0.850	& 1.317	& 0.357 \\
+MP3 128kbps & 7.662	& 6.909	& 0.001	& 0.998	& 0.015	& 0.973 \\
+Time Scale $\pm 10\%$ & -1.457	& -38.571	& 0.499	& 0.002	& 5.313	& 0.002\\
+Re-recording & 1.842	& -0.274	& 0.483	& 0.035	& 5.262	& 0.008 \\
 \bottomrule
 \end{tabular}
+\caption{Attack robustness metrics: SNR (audio quality), BER (bit errors), NC (pattern correlation)}
+\label{tab:results}
 \end{table}
 
-\section{Key Learnings}
+\subsection{Results}
+In order to effectively demonstrate the watermarking, the original and encrypted watermarks are shown in Figure \ref{fig:watermarks}.
+\begin{figure}[h!]
+	\centering
+	\begin{subfigure}{0.4\textwidth}
+		\centering
+		\includegraphics[width=0.5\textwidth]{../watermark.png}
+		\caption{Original Watermark}
+		\label{fig:original_watermark}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}{0.4\textwidth}
+		\centering
+		\includegraphics[width=0.5\textwidth]{../results/extract_results/extracted_watermark.png}
+		\caption{Extracted Watermark}
+		\label{fig:encrypted_watermark}
+	\end{subfigure}
+	\label{fig:Insert the Reference Tag}
+\end{figure}
 
-\textbf{Frequency band selection.} Embedding in detail bands ($D_1, D_2, D_3$) created tinny audio—high frequencies are perceptually obvious. Low-frequency $A_3$ works better but remains vulnerable to HPF.
+You would note that the structure of the extracted image is very similar, with even fine details like the numbers on the dial being preserved.
 
-\textbf{Reconstruction isn't perfect.} Haar DWT padding and DTMT truncation ($K = \min(64, L_2/2)$) introduce errors. Hard segmentation creates discontinuities like cutting audio without cross-fading.
+Now, the attacked images are shown in figure \ref{fig:attacked_watermarks}.
+\begin{figure*}[h!]
+    \centering
+    % Row 1
+    \begin{subfigure}{0.18\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{../results/extract_results/extracted_watermark.png}
+		\caption{}
+		\label{fig:encrypted and extracted watermark}
+    \end{subfigure}
+    \begin{subfigure}{0.18\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{../results/attack_results/CROP_20pct/extracted_watermark.png}
+		\caption{}
+		\label{fig:cropped watermark}
+    \end{subfigure}
+    \begin{subfigure}{0.18\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{../results/attack_results/GAUSS_noise_20dB/extracted_watermark.png}
+		\caption{}
+		\label{fig:gaussian noise watermark}
+    \end{subfigure}
+    \begin{subfigure}{0.18\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{../results/attack_results/HPF_100Hz/extracted_watermark.png}
+		\caption{}
+		\label{fig:high pass filter watermark}
+    \end{subfigure}
+    \begin{subfigure}{0.18\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{../results/attack_results/LPF_4000Hz/extracted_watermark.png}
+		\caption{}
+		\label{fig:low pass filter watermark}
+    \end{subfigure}
 
-\textbf{Metrics vs perception.} 40 dB SNR seems imperceptible but ears detect frequency distortions. Psychoacoustic masking is essential for true imperceptibility.
+    \vspace{0.3cm}
 
-\textbf{Numerical precision matters.} MLNCML's $2^{100}$ keyspace provides security, but floating-point rounding breaks decryption. Chaotic systems demand exact parameters.
+    % Row 2
+    \begin{subfigure}{0.18\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{../results/attack_results/MP3_32kbps/extracted_watermark.png}
+		\caption{}
+		\label{fig:mp3 32kbps watermark}
+    \end{subfigure}
+    \begin{subfigure}{0.18\textwidth}
+        \centering
+		\includegraphics[width=\linewidth]{../results/attack_results/MP3_64kbps/extracted_watermark.png}
+		\caption{}
+		\label{fig:mp3 64kbps watermark}
+    \end{subfigure}
+    \begin{subfigure}{0.18\textwidth}
+        \centering
+		\includegraphics[width=\linewidth]{../results/attack_results/MP3_128kbps/extracted_watermark.png}
+		\caption{}
+		\label{fig:mp3 128kbps watermark}
+    \end{subfigure}
+    \begin{subfigure}{0.18\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{../results/attack_results/Random_time_scaling/extracted_watermark.png}
+		\caption{}
+		\label{fig:time scaled watermark}
+    \end{subfigure}
+    \begin{subfigure}{0.18\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{../results/attack_results/Re_recording/extracted_watermark.png}
+		\caption{}
+		\label{fig:re-recorded watermark}
+    \end{subfigure}
+	\label{fig:attacked_watermarks}
+	\caption{(a) No attack extraction (b) 20\% Crop (c) Gaussian Noise 20dB (d) HPF 100Hz (e) LPF 4kHz (f) MP3 32kbps (g) MP3 64kbps (h) MP3 128kbps (i) Random Time Scaling $\pm$10\% (j) Re-recording}
+\end{figure*}
 
-\textbf{Moments provide robustness.} Norm ratios survive attacks because perturbations affect $M_1$ and $M_2$ similarly. Direct coefficient modification fails.
-
-\textbf{Parameter tuning.} $\delta=0.05$ balances robustness and artifacts through trial and error. Future work needs adaptive embedding, error correction, windowing, and better wavelets.
-
+From the results, we see that this watermarking method is very effective against nearly all attacks, save for re-recording and time scaling.
+However, an important note is that the audio quality is significantly degraded in these two cases, as can be seen from the very low SNR and SI-SDR values in Table \ref{tab:results}.
+This means that the low performance of the watermarking method is not the primary issue, as pirates or other opposition parties would be unlikely to use such low-quality audio.
 \newpage
 
 \section*{Appendix: System Architecture}
